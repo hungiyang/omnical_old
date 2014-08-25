@@ -191,7 +191,7 @@ def read_redundantinfo(infopath, verbose = False):
 	if not os.path.isfile(infopath):
 		raise Exception('Error: file path %s does not exist!'%infopath)
 	with open(infopath) as f:
-		farray=array('d')
+		farray = array('d')
 		farray.fromstring(f.read())
 		datachunk = np.array(farray)
 		marker = 9999999
