@@ -567,6 +567,237 @@ def omnical2omnigain(omnicalPath, utctimePath, info, outputPath = None):#outputP
 	opomnigain.tofile(outputPath + '.omnigain')
 	opomnifit.tofile(outputPath + '.omnifit')
 
+def remove_one_antenna(Info,badant):
+	info = Info.get_info()
+	#nAntenna and antloc
+	nAntenna = info['nAntenna']-1 
+	badindex = list(info['subsetant']).index(badant)     #the index of the bad antenna in previous subsetant
+
+	subsetant = list(info['subsetant'])[:]
+	subsetant.pop(badindex)      #delete the bad antenna from subsetant
+	antloc = np.delete(np.array(info['antloc']),badindex,0)   #delete the bad antenna from antloc
+		 
+
+	#ubl and nUBL
+	index = 0              #to keep track of the index of ubl the loop is at
+	deletelist = []
+	for ubl in info['ublindex']:    
+		if len(ubl) > 1:
+			index += 1
+		elif ubl[0,0] == subsetant[badant] or ubl[0,1] == subsetant[badant] :
+			deletelist.append(index)
+			index += 1
+
+	ubl = info['ubl'][:]
+	ubl = np.array([ubl[i] for i in range(len(ubl)) if i not in deletelist])
+	nUBL=len(ubl);
+
+	#subsetbl and nBaseline		
+	goodpairs_old = [i[::-1] for i in info['bl2d']]    #the old goodpairs
+	goodpairs_index = [i for i in range(len(goodpairs_old)) if badindex not in goodpairs_old[i]]       #the index of goodpairs that doesn't contain the bad antenna
+	temp = np.array([goodpairs_old[i] for i in goodpairs_index])   #the new goodpairs with antenna number (all antenna)
+	goodpairs = np.zeros(temp.shape)
+	for i in range(len(temp)):
+		for j in range(len(temp[i])):
+			if temp[i,j] > badindex:
+				goodpairs[i,j] = temp[i,j]-1
+			else:
+				goodpairs[i,j] = temp[i,j]
+
+
+		
+	subsetbl = [info['subsetbl'][i] for i in goodpairs_index]  #the new subsetbl
+	nBaseline = len(subsetbl)
+
+
+	counter = 0
+	ubl_old2new = np.zeros([len(info['ubl'])],dtype = 'int')     #from old ubl index to new ubl index
+	for i in range(len(info['ubl'])):
+		if i in deletelist:
+			ubl_old2new[i] = counter
+		else:
+			ubl_old2new[i] = counter
+			counter += 1
+
+	bltoubl = []
+	for i in range(len(info['crossindex'])):
+		pair = [info['subsetant'][index] for index in info['bl2d'][info['crossindex'][i]]]   #get the pair of antenna from each crossindex 
+		if badant in pair:
+			pass
+		else:
+			bltoubl.append(ubl_old2new[info['bltoubl'][i]])   #append the new ubl index that doesn't have the bad antenna
+	bltoubl = np.array(bltoubl)
+
+	#################################################################################
+	#reversed:   cross only bl if reversed -1, otherwise 1
+	def dis(a1,a2):    #calculate the norm of the difference of two vectors
+		return np.linalg.norm(np.array(a1)-np.array(a2))
+
+	crosspair_old = []
+	for p in goodpairs_old:
+		if p[0]!=p[1]:
+			crosspair_old.append(p)
+	goodcross = []
+	for i in range(len(crosspair_old)):
+		if badindex not in crosspair_old[i]:
+			goodcross.append(i)
+
+	crosspair=[]
+	for p in goodpairs:
+		if p[0]!=p[1]:
+			crosspair.append(p)
+			
+	reverse=[info['reversed'][i] for i in goodcross]
+
+
+	######################################################################################
+	#reversedauto: the index of good baselines (auto included) in all baselines
+	#autoindex: index of auto bls among good bls
+	#crossindex: index of cross bls among good bls
+	#ncross
+	reversedauto = range(len(goodpairs))
+	#find the autoindex and crossindex in goodpairs
+	autoindex=[]
+	crossindex=[]
+	for i in range(len(goodpairs)):
+		if goodpairs[i][0]==goodpairs[i][1]:
+			autoindex.append(i)
+		else:
+			crossindex.append(i)
+	for i in autoindex:
+		reversedauto[i]=1
+	for i in range(len(crossindex)):
+		reversedauto[crossindex[i]]=reverse[i]
+	reversedauto=np.array(reversedauto)
+	autoindex=np.array(autoindex)
+	crossindex=np.array(crossindex)
+	ncross=len(crossindex)
+
+
+	###################################################
+	#bl2d:  from 1d bl index to a pair of antenna numbers
+	bl2d=[]
+	for pair in goodpairs:
+		bl2d.append(pair[::-1])
+	bl2d=np.array(bl2d)
+
+	###################################################
+	#ublcount:  for each ubl, the number of good cross bls corresponding to it
+	countdict={}
+	for bl in bltoubl:
+		countdict[bl]=0
+
+	for bl in bltoubl:
+		countdict[bl]+=1
+
+	ublcount=[]
+	for i in range(nUBL):
+		ublcount.append(countdict[i])
+	ublcount=np.array(ublcount)
+
+	####################################################################################
+	#ublindex:  //for each ubl, the vector<int> contains (ant1, ant2, crossbl)
+	countdict={}
+	for bl in bltoubl:
+		countdict[bl]=[]
+
+	for i in range(len(crosspair)):
+		ant1=crosspair[i][1]
+		ant2=crosspair[i][0]
+		countdict[bltoubl[i]].append([ant1,ant2,i])
+
+	ublindex=[]
+	for i in range(nUBL):
+		ublindex.append(countdict[i])
+	#turn each list in ublindex into np array
+	for i in range(len(ublindex)):
+		ublindex[i]=np.array(ublindex[i])
+	ublindex=np.array(ublindex)
+
+	###############################################################################
+	#bl1dmatrix: a symmetric matrix where col/row numbers are antenna indices and entries are 1d baseline index not counting auto corr
+			#I suppose 99999 for bad and auto baselines?
+	bl1dmatrix=99999*np.ones([nAntenna,nAntenna],dtype='int16')
+	for i in range(len(crosspair)):
+		bl1dmatrix[crosspair[i][1]][crosspair[i][0]]=i
+		bl1dmatrix[crosspair[i][0]][crosspair[i][1]]=i
+
+	####################################################################################3
+	#degenM:
+	a=[]
+	for i in range(len(antloc)):
+		a.append(np.append(antloc[i],1))
+	a=np.array(a)
+
+	d=[]
+	for i in range(len(ubl)):
+		d.append(np.append(ubl[i],0))
+	d=np.array(d)
+
+	m1=-a.dot(la.pinv(np.transpose(a).dot(a), cond = 10**(-6))).dot(np.transpose(a))
+	m2=d.dot(la.pinv(np.transpose(a).dot(a), cond = 10**(-6))).dot(np.transpose(a))
+	degenM = np.append(m1,m2,axis=0)
+
+	#####################################################################################
+	#A: A matrix for logcal amplitude
+	A=np.zeros([len(crosspair),nAntenna+len(ubl)])
+	for i in range(len(crosspair)):
+		A[i][crosspair[i][0]]=1
+		A[i][crosspair[i][1]]=1
+		A[i][nAntenna+bltoubl[i]]=1
+	A=sps.csr_matrix(A)
+
+
+	#################################################################################
+	#B: B matrix for logcal phase
+	B=np.zeros([len(crosspair),nAntenna+len(ubl)])
+	for i in range(len(crosspair)):
+		B[i][crosspair[i][0]]=reverse[i]*1
+		B[i][crosspair[i][1]]=reverse[i]*-1
+		B[i][nAntenna+bltoubl[i]]=1
+	B=sps.csr_matrix(B)
+
+
+	############################################################################
+	#create info dictionary
+	info={}
+	info['nAntenna']=nAntenna
+	info['nUBL']=nUBL
+	info['nBaseline']=nBaseline
+	info['subsetant']=subsetant
+	info['antloc']=antloc
+	info['subsetbl']=subsetbl
+	info['ubl']=ubl
+	info['bltoubl']=bltoubl
+	info['reversed']=reverse
+	info['reversedauto']=reversedauto
+	info['autoindex']=autoindex
+	info['crossindex']=crossindex
+	#info['ncross']=ncross
+	info['bl2d']=bl2d
+	info['ublcount']=ublcount
+	info['ublindex']=ublindex
+	info['bl1dmatrix']=bl1dmatrix
+	info['degenM']=degenM
+	info['A']=A
+	info['B']=B
+	with warnings.catch_warnings():
+			warnings.filterwarnings("ignore",category=DeprecationWarning)
+			info['At'] = info['A'].transpose()
+			info['Bt'] = info['B'].transpose()
+			info['AtAi'] = la.pinv(info['At'].dot(info['A']).todense(), cond = 10**(-6))#(AtA)^-1
+			info['BtBi'] = la.pinv(info['Bt'].dot(info['B']).todense(), cond = 10**(-6))#(BtB)^-1
+			info['AtAiAt'] = info['AtAi'].dot(info['At'].todense())#(AtA)^-1At
+			info['BtBiBt'] = info['BtBi'].dot(info['Bt'].todense())#(BtB)^-1Bt
+			info['PA'] = info['A'].dot(info['AtAiAt'])#A(AtA)^-1At
+			info['PB'] = info['B'].dot(info['BtBiBt'])#B(BtB)^-1Bt
+			info['ImPA'] = sps.identity(ncross) - info['PA']#I-PA
+			info['ImPB'] = sps.identity(ncross) - info['PB']#I-PB
+	return RedundantInfo(info)
+
+
+
+
 class RedundantInfo(_O.RedundantInfo):#a class that contains redundant calibration information that should only be passed into C++
 	def __init__(self, info):
 		_O.RedundantInfo.__init__(self)

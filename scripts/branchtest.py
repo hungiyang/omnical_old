@@ -1,3 +1,5 @@
+import sys 
+sys.path.insert(0,'/home/eric/omnical/src')
 import datetime
 import socket, multiprocessing, math, random, traceback, ephem, string, commands, datetime
 import time
@@ -17,7 +19,7 @@ with warnings.catch_warnings():
     
 import calibration_omni as omni
 
-correctinfo = omni.read_redundantinfo('/home/ericy/omnical/redundant_info/redundantinfo_badant2_4_5_6_8_9_10badubl1_2_3_5_8_9.txt')
+#correctinfo = omni.read_redundantinfo('/home/ericy/omnical/redundant_info/redundantinfo_badant2_4_5_6_8_9_10badubl1_2_3_5_8_9.txt')
 calibrator = omni.RedundantCalibrator(32)
 
 calibrator.antennaLocationTolerance = .1
@@ -61,8 +63,16 @@ calibrator.antennaLocation=np.reshape(np.array(flat),(len(flat)/3,3))
 
 calibrator.compute_redundantinfo()
 
-info1=correctinfo
-info2=calibrator.info
+
+info2=calibrator.Info
+
+test = omni.remove_one_antenna(info2,10)
+
+
+
+
+
+
 
 #input two different redundant info, output True if they are the same and False if they are different
 def compare_info(info1,info2,printfirstdiff=True):
@@ -95,9 +105,8 @@ def compare_info(info1,info2,printfirstdiff=True):
 		print "info doesn't have the same shape"
 		return False
 	
-print compare_info(info1,info2)
 
-print calibrator.get_baseline([1,2])
+
 
 
 def compute_UBL(tolerance = 0.1):
@@ -134,8 +143,7 @@ def compute_UBL(tolerance = 0.1):
 	ublall=np.array(ublall)
 	return ublall
 
-test=compute_UBL()
-test2=calibrator.compute_UBL()
+
 
 
 
