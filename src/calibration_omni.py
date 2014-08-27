@@ -787,6 +787,7 @@ class RedundantCalibrator:
         self.antennaLocationTolerance = 10**(-6)
         self.badAntenna = []
         self.badUBL = []
+        self.badUBLpair = []
         self.totalVisibilityId = np.concatenate([[[i,j] for i in range(j + 1)] for j in range(self.nTotalAnt)])#PAPER miriad convention by default
 
         self.Info = None
@@ -835,10 +836,13 @@ class RedundantCalibrator:
         self.badAntenna = np.array(rawinfo[0]).astype(int)
         if self.badAntenna[0] < 0:
             self.badAntenna = np.zeros(0)
-
-        self.badUBL = np.array(rawinfo[1]).astype(int)
-        if self.badUBL[0] < 0:
-            self.badUBL = np.zeros(0)
+		
+        if len(np.array(rawinfo[1]).astype(int))%2 != 0:
+            raise Exception(self.className + methodName +"Error: Format error in " + arrayinfopath + "badUBL should be specified by pairs of antenna, not odd numbers of antenna")
+        rawpair = np.array(rawinfo[1]).astype(int)
+        self.badUBLpair = np.reshape(rawpair,(len(rawpair)/2,2))
+        #if self.badUBL[0] < 0:
+        #    self.badUBL = np.zeros(0)
 
         self.antennaLocationTolerance = rawinfo[2][0]
 
@@ -1039,26 +1043,34 @@ class RedundantCalibrator:
         #use the function compute_UBL to find the ubl
         tolerance=self.antennaLocationTolerance;
         ublall=self.compute_UBL(tolerance)
-        #delete the bad ubl's
-        ubl=np.delete(ublall,np.array(self.badUBL).astype('int'),0)
-        nUBL=len(ubl);
         #timer.tick('b')
         #################################################################################################
         #calculate the norm of the difference of two vectors (just la.norm actually)
         def dis(a1,a2):
             return np.linalg.norm(np.array(a1)-np.array(a2))
+        #find badUBL with badUBLpair
+        def find_ublindex(pair):
+            for i in range(len(ublall)):
+                if dis(self.antennaLocation[pair[0]]-self.antennaLocation[pair[1]],ublall[i]) < tolerance or dis(self.antennaLocation[pair[0]]-self.antennaLocation[pair[1]],-ublall[i]) < tolerance:
+                    return i
+            raise Exception("Error: something wrong in identifying badUBL from badUBLpair")    #delete this line afterwards
+        for p in self.badUBLpair:
+            self.badUBL.append(find_ublindex(p))
+        #delete the bad ubl's
+        ubl=np.delete(ublall,np.array(self.badUBL).astype('int'),0)
+        nUBL=len(ubl);
         #find nBaseline (include auto baselines) and subsetbl
         badbl=[ublall[i] for i in self.badUBL]
         nbl=0;
         goodpairs=[];
         for i in range(len(antloc)):
-            for j in range(i+1):
-                bool=False
-                for bl in badbl:
-                    bool = bool or dis(antloc[i]-antloc[j],bl)<tolerance or dis(antloc[i]-antloc[j],-bl)<tolerance
-                if bool == False:
-                    nbl+=1
-                    goodpairs.append([i,j])
+			for j in range(i+1):
+				bool=False
+				for bl in badbl:
+					bool = bool or dis(antloc[i]-antloc[j],bl)<tolerance or dis(antloc[i]-antloc[j],-bl)<tolerance
+				if bool == False:
+					nbl+=1
+					goodpairs.append([i,j])
         nBaseline=len(goodpairs)
         #from a pair of good antenna index to baseline index
         #print goodpairs
@@ -1133,7 +1145,7 @@ class RedundantCalibrator:
 
         for bl in bltoubl:
             countdict[bl]+=1
-
+		
         ublcount=[]
         for i in range(nUBL):
             ublcount.append(countdict[i])

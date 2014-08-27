@@ -49,8 +49,8 @@ class TestMethods(unittest.TestCase):
         uvfiles = [os.path.dirname(os.path.realpath(__file__)) + '/test.uv']
         wantpols = {'xx':-5}#, 'yy':-6}
 
-        infopaths = {'xx':os.path.dirname(os.path.realpath(__file__)) + '/../doc/redundantinfo_PSA32.txt', 'yy':os.path.dirname(os.path.realpath(__file__)) + '/../doc/redundantinfo_PSA32.txt'}
-        arrayinfos = {'xx':os.path.dirname(os.path.realpath(__file__)) + '/../doc/arrayinfo_apprx_PAPER32.txt', 'yy':os.path.dirname(os.path.realpath(__file__)) + '/../doc/arrayinfo_apprx_PAPER32.txt'}
+        #infopaths = {'xx':os.path.dirname(os.path.realpath(__file__)) + '/../doc/redundantinfo_PSA32.txt', 'yy':os.path.dirname(os.path.realpath(__file__)) + '/../doc/redundantinfo_PSA32.txt'}
+        arrayinfos = {'xx':os.path.dirname(os.path.realpath(__file__)) + '/../doc/arrayinfo_apprx_PAPER32_badUBLpair.txt', 'yy':os.path.dirname(os.path.realpath(__file__)) + '/../doc/arrayinfo_apprx_PAPER32_badUBLpair.txt'}
 
         oppath = os.path.dirname(os.path.realpath(__file__)) + '/results/'
         if not os.path.isdir(oppath):
