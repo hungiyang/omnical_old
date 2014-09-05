@@ -1064,18 +1064,20 @@ class RedundantCalibrator:
         def dis(a1,a2):
             return np.linalg.norm(np.array(a1)-np.array(a2))
         #find badUBL with badUBLpair
-        def find_ublindex(pair):
+        def find_ublindex_all(pair):
             for i in range(len(ublall)):
                 if dis(self.antennaLocation[pair[0]]-self.antennaLocation[pair[1]],ublall[i]) < tolerance or dis(self.antennaLocation[pair[0]]-self.antennaLocation[pair[1]],-ublall[i]) < tolerance:
                     return i
-            raise Exception("Error: something wrong in identifying badUBL from badUBLpair")    #delete this line afterwards
+            return None
+            #raise Exception("Error: something wrong in identifying badUBL from badUBLpair")    #delete this line afterwards
         for p in self.badUBLpair:
-            self.badUBL.append(find_ublindex(p))
+            self.badUBL.append(find_ublindex_all(p))
+        self.badUBL = [i for i in self.badUBL if i != None]
         #delete the bad ubl's
         ubl=np.delete(ublall,np.array(self.badUBL).astype('int'),0)
         nUBL=len(ubl);
-        #find nBaseline (include auto baselines) and subsetbl
         badbl=[ublall[i] for i in self.badUBL]
+        #find nBaseline (include auto baselines) and subsetbl
         nbl=0;
         goodpairs=[];
         for i in range(len(antloc)):
@@ -1086,10 +1088,11 @@ class RedundantCalibrator:
                 if bool == False:
                     nbl+=1
                     goodpairs.append([i,j])
+        #exclude pairs that are not in totalVisibilityId
+        goodpairs = [p for p in goodpairs if self.get_baseline([subsetant[p[0]],subsetant[p[1]]]) != None]
         nBaseline=len(goodpairs)
         #from a pair of good antenna index to baseline index
-        #print goodpairs
-        subsetbl=np.array([self.get_baseline([subsetant[bl[0]],subsetant[bl[1]]]) for bl in goodpairs])
+        subsetbl = np.array([self.get_baseline([subsetant[bl[0]],subsetant[bl[1]]]) for bl in goodpairs])
         #timer.tick('c')
         ##################################################################################
         #bltoubl: cross bl number to ubl index
@@ -1099,11 +1102,12 @@ class RedundantCalibrator:
             for k in range(len(ubl)):
                 if dis(antloc[i]-antloc[j],ubl[k])<tolerance or dis(antloc[i]-antloc[j],-ubl[k])<tolerance:
                     return k
+            print pair
             return "no match"
         bltoubl=[];
-        for i in goodpairs:
-            if i[0]!=i[1]:
-                bltoubl.append(findublindex(i))
+        for p in goodpairs:
+            if p[0]!=p[1]:
+                bltoubl.append(findublindex(p))
         #timer.tick('d')
         #################################################################################
         #reversed:   cross only bl if reversed -1, otherwise 1
@@ -1154,12 +1158,14 @@ class RedundantCalibrator:
         #timer.tick('g')
         ###################################################
         #ublcount:  for each ubl, the number of good cross bls corresponding to it
+        
         countdict={}
         for bl in bltoubl:
             countdict[bl]=0
 
         for bl in bltoubl:
             countdict[bl]+=1
+        
         
         ublcount=[]
         for i in range(nUBL):
@@ -1277,12 +1283,13 @@ class RedundantCalibrator:
             raise Exception("input needs to be number not string")
             return
         try:
-            return self.totalVisibilityId.tolist().index(pair)
+            return self.totalVisibilityId.tolist().index([pair[0],pair[1]])
         except:
             try:
                 return self.totalVisibilityId.tolist().index([pair[1], pair[0]])
             except:
-                raise Exception("Error: antenna pair %s not found in self.totalVisibilityId."%pair)
+                #raise Exception("Error: antenna pair %s not found in self.totalVisibilityId."%pair)
+                return None
         #Eric's old code. It's buggy and assumes totalVisibilityId contains a1,a2 where a2<=a1 always
         #sortp = np.array(sorted(pair))
         #for i in range(len(self.totalVisibilityId)):
@@ -1334,36 +1341,24 @@ class RedundantCalibrator:
         if type(tolerance) == str:
             raise Exception("tolerance needs to be number not string")
             return
-        #remove the bad antennas
-        nant=len(self.antennaLocation)    #nant = self.nTotalAnt
-        subsetant=[i for i in range(nant) if i not in self.badAntenna]
-        nAntenna=len(subsetant)
-        antloc = np.array([self.antennaLocation[ant] for ant in subsetant])
         ubllist = np.array([np.array([np.array([0,0,0]),1])]);
-        #create a mapping from antenna number to antenna index
-        count = 0
-        number2index = np.zeros(self.nTotalAnt)
-        for i in range(self.nTotalAnt):
-            number2index[i] = count
-            if i not in self.badAntenna:
-                count += 1
         for pair in self.totalVisibilityId:
-            i = number2index[pair[0]]
-            j = number2index[pair[1]]
-            bool = True
-            for k in range(len(ubllist)):
-                if  la.norm(antloc[i]-antloc[j]-ubllist[k][0])<tolerance:
-                    n=ubllist[k][1]
-                    ubllist[k][0]=1/(n+1.0)*(n*ubllist[k][0]+antloc[i]-antloc[j])
-                    ubllist[k][1]+=1
-                    bool = False
-                elif  la.norm(antloc[i]-antloc[j]+ubllist[k][0])<tolerance:
-                    n=ubllist[k][1]
-                    ubllist[k][0]=1/(n+1.0)*(n*ubllist[k][0]-(antloc[i]-antloc[j]))
-                    ubllist[k][1]+=1
-                    bool = False
-            if bool :
-                ubllist = np.append(ubllist,np.array([np.array([antloc[j]-antloc[i],1])]),axis=0)
+            if pair[0] not in self.badAntenna and pair[1] not in self.badAntenna:
+                [i,j] = pair
+                bool = True
+                for k in range(len(ubllist)):
+                    if  la.norm(self.antennaLocation[i]-self.antennaLocation[j]-ubllist[k][0])<tolerance:
+                        n=ubllist[k][1]
+                        ubllist[k][0]=1/(n+1.0)*(n*ubllist[k][0]+self.antennaLocation[i]-self.antennaLocation[j])
+                        ubllist[k][1]+=1
+                        bool = False
+                    elif  la.norm(self.antennaLocation[i]-self.antennaLocation[j]+ubllist[k][0])<tolerance:
+                        n=ubllist[k][1]
+                        ubllist[k][0]=1/(n+1.0)*(n*ubllist[k][0]-(self.antennaLocation[i]-self.antennaLocation[j]))
+                        ubllist[k][1]+=1
+                        bool = False
+                if bool :
+                    ubllist = np.append(ubllist,np.array([np.array([self.antennaLocation[j]-self.antennaLocation[i],1])]),axis=0)
         ubllist = np.delete(ubllist,0,0)
         ublall=[]
         for ubl in ubllist:
