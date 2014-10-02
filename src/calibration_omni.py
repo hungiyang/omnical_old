@@ -1088,9 +1088,32 @@ class RedundantCalibrator:
                 if bool == False:
                     nbl+=1
                     goodpairs.append([i,j])
+
+        #correct the orders of pairs in goodpair
+        def correct_pairorder(pair):
+            try:
+                self.totalVisibilityId.tolist().index([pair[0],pair[1]])
+                return True
+            except:
+                try:
+                    self.totalVisibilityId.tolist().index([pair[1], pair[0]])
+                    return False
+                except:
+                    return None
+                    
         #exclude pairs that are not in totalVisibilityId
-        goodpairs = [p for p in goodpairs if self.get_baseline([subsetant[p[0]],subsetant[p[1]]]) != None]
+        temp = []
+        for p in goodpairs:
+            cond = correct_pairorder([subsetant[p[0]],subsetant[p[1]]])
+            if cond == True:
+                temp.append(p)
+            if cond == False:
+                temp.append(p[::-1])
+        goodpairs = temp
+        
+        #goodpairs = [correct_pairorder([subsetant[p[0]],subsetant[p[1]]]) for p in goodpairs if (correct_pairorder([subsetant[p[0]],subsetant[p[1]]]) != None and correct_pairorder([subsetant[p[0]],subsetant[p[1]]]) == True)]  #correct_pairorder([subsetant[p[0]],subsetant[p[1]]])
         nBaseline=len(goodpairs)
+
         #from a pair of good antenna index to baseline index
         subsetbl = np.array([self.get_baseline([subsetant[bl[0]],subsetant[bl[1]]]) for bl in goodpairs])
         #timer.tick('c')
@@ -1297,8 +1320,8 @@ class RedundantCalibrator:
                 #return i
         #raise Exception("antenna index out of range")
 
-    #with antenna locations and tolerance, calculate the unique baselines. (In the order of omniscope baseline index convention)
-    
+                
+                
     #compute_UBL returns the average of all baselines in that ubl group
     def compute_UBL_old(self,tolerance = 0.1):
         #check if the tolerance is not a string
