@@ -3,7 +3,7 @@ import numpy as np
 import aipy as ap
 import commands, os, time, math, ephem
 import omnical.calibration_omni as omni
-import omnical2.calibration_omni as omni2
+#import omnical2.calibration_omni as omni2
 
 class TestMethods(unittest.TestCase):
     def setUp(self):
