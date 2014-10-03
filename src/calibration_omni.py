@@ -1202,8 +1202,8 @@ class RedundantCalibrator:
             countdict[bl]=[]
 
         for i in range(len(crosspair)):
-            ant1=crosspair[i][1]
-            ant2=crosspair[i][0]
+            ant1=crosspair[i][0]
+            ant2=crosspair[i][1]
             countdict[bltoubl[i]].append([ant1,ant2,i])
 
         ublindex=[]
