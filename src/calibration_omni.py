@@ -1143,9 +1143,9 @@ class RedundantCalibrator:
             i=crosspair[k][0]
             j=crosspair[k][1]
             if dis(antloc[i]-antloc[j],ubl[bltoubl[k]])<tolerance:
-                reverse.append(1)
-            elif dis(antloc[i]-antloc[j],-ubl[bltoubl[k]])<tolerance:
                 reverse.append(-1)
+            elif dis(antloc[i]-antloc[j],-ubl[bltoubl[k]])<tolerance:
+                reverse.append(1)
             else :
                 print "something's wrong with bltoubl"
         #timer.tick('e')
@@ -1176,7 +1176,7 @@ class RedundantCalibrator:
         #bl2d:  from 1d bl index to a pair of antenna numbers
         bl2d=[]
         for pair in goodpairs:
-            bl2d.append(pair[::-1])
+            bl2d.append(pair)#(pair[::-1])
         bl2d=np.array(bl2d)
         #timer.tick('g')
         ###################################################
@@ -1204,7 +1204,7 @@ class RedundantCalibrator:
         for i in range(len(crosspair)):
             ant1=crosspair[i][0]
             ant2=crosspair[i][1]
-            countdict[bltoubl[i]].append([ant1,ant2,i])
+            countdict[bltoubl[i]].append([ant1,ant2,i])  #([ant1,ant2,i])
 
         ublindex=[]
         for i in range(nUBL):
@@ -1249,8 +1249,8 @@ class RedundantCalibrator:
         #B: B matrix for logcal phase
         B=np.zeros([len(crosspair),nAntenna+len(ubl)])
         for i in range(len(crosspair)):
-            B[i][crosspair[i][0]]=reverse[i]*1
-            B[i][crosspair[i][1]]=reverse[i]*-1
+            B[i][crosspair[i][0]]=reverse[i]*-1   #1
+            B[i][crosspair[i][1]]=reverse[i]*1  #-1
             B[i][nAntenna+bltoubl[i]]=1
         B=sps.csr_matrix(B)
         #timer.tick('k')
@@ -1335,7 +1335,8 @@ class RedundantCalibrator:
         antloc = np.array([self.antennaLocation[ant] for ant in subsetant])
         ubllist = np.array([np.array([np.array([0,0,0]),1])]);
         for i in range(len(antloc)):
-            for j in range(i+1,len(antloc)):
+            #for j in range(i+1,len(antloc)):    #(this gives the same redundant info as the correct info saved in test)
+            for j in range(i+1):                 
                 bool = True
                 for k in range(len(ubllist)):
                     if  la.norm(antloc[i]-antloc[j]-ubllist[k][0])<tolerance:
